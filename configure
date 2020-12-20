@@ -172,23 +172,32 @@ $([ "${NO_INTERNET-}" != "true" ] && echo "sudo systemctl restart dnsmasq")
 EOF
 sudo chmod +x /bin/rpi-wifi.sh
 
-# Configure cron job
-# sudo bash -c 'cat > /etc/systemd/system/rpi-wifi.service' << EOF
-# [Unit]
-# Description=Simultaneous AP and Managed Mode Wifi on Raspberry Pi
-# Requires=network.target
-# After=network.target
-#
-# [Service]
-# ExecStart=/bin/bash -c 'rpi-wifi.sh'
-# User=root
-#
-# [Install]
-# WantedBy=multi-user.target
-# EOF
-# sudo systemctl daemon-reload
-# sudo systemctl enable rpi-wifi.service
 crontab -l | { cat; echo "@reboot /bin/rpi-wifi.sh"; } | crontab -
 
+#
+# bbeeson
+#
+# disable redundant dhclient
+sudo apt remove -y isc-dhcp-client
+# remove others and ...
+sudo rm -rf /etc/systemd/system/dhcpcd.service.d
+sudo rm -rf /etc/systemd/system/dhcpcd5.service
+# just run dhcpcd on just wlan0
+sudo bash -c 'cat > /etc/systemd/dhcpcd.service' << EOF
+[Unit]
+Description=dhcpcd on wlan0s
+Wants=network.target
+Before=network.target
+
+[Service]
+Type=forking
+PIDFile=/run/dhcpcd.pid
+ExecStart=/sbin/dhcpcd wlan0
+ExecStop=/sbin/dhcpcd -x
+
+[Install]
+WantedBy=multi-user.target
+Alias=dhcpcd5.service
+EOF
 # Finish
 echo "Wifi configuration is finished! Please reboot your Raspberry Pi to apply changes..."
